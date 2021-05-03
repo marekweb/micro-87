@@ -1,9 +1,9 @@
-const FLAGS_ADDR = 0;
-const PC_ADDR = 1;
-const SP_ADDR = 3;
-const CSP_ADDR = 4;
-const STACK_ADDR = 6;
-const CSTACK_ADDR = STACK_ADDR + 256;
+export const FLAGS_ADDR = 0;
+export const PC_ADDR = 1;
+export const SP_ADDR = 3;
+export const CSP_ADDR = 4;
+export const STACK_ADDR = 0x100;
+export const CSTACK_ADDR = 0x200;
 
 /**
  * Unsigned byte
@@ -34,6 +34,18 @@ export class Memory extends DataView {
     return this.getUint8(FLAGS_ADDR);
   }
 
+  set flags(value: Uint8) {
+    this.setUint8(FLAGS_ADDR, value);
+  }
+
+  getFlag(n: number) {
+    (this.flags >> n) & 1;
+  }
+
+  setFlag(n: number) {
+    this.flags |= 1 << n;
+  }
+
   get pc(): Uint16 {
     return this.getUint16(PC_ADDR);
   }
@@ -50,8 +62,8 @@ export class Memory extends DataView {
     this.setUint8(SP_ADDR, value);
   }
 
-  get tos(): Uint16 {
-    return this.getUint16(STACK_ADDR + (this.sp - 1) * 2);
+  peek(offset: number = 0): Uint16 {
+    return this.getUint16(STACK_ADDR + (this.sp - 1 - offset) * 2);
   }
 
   get csp(): Uint8 {
@@ -62,11 +74,14 @@ export class Memory extends DataView {
     this.setUint8(CSP_ADDR, value);
   }
 
-  pushC() {
+  pushPc(newPc: Uint16) {
+    // TODO: max assertion
     this.setUint16(CSTACK_ADDR + this.csp++ * 2, this.pc);
+    this.pc = newPc;
   }
 
-  popC(): void {
+  popPc(): void {
+    // TODO: max assertion
     this.pc = this.getUint16(CSTACK_ADDR + --this.csp * 2);
   }
 
@@ -83,7 +98,7 @@ export class Memory extends DataView {
   }
 
   readNextUint16(): Uint16 {
-    const value = this.getUint16((this.pc += 2));
+    const value = this.getUint16(this.pc);
     this.pc += 2;
     return value;
   }
@@ -106,13 +121,11 @@ export class Memory extends DataView {
     return array;
   }
 
-  getDebugState() {
-    return {
-      pc: this.pc,
-      sp: this.sp,
-      stack: this.getStackAsArray(),
-      tos: this.tos,
-      op: this.getUint8(this.pc),
-    };
+  getCallStackAsArray(): number[] {
+    let array = [];
+    for (let i = 0; i < this.csp; i++) {
+      array.push(this.getUint16(CSTACK_ADDR + i * 2));
+    }
+    return array;
   }
 }
